@@ -1,34 +1,72 @@
-/* How to Hook with Logos
-Hooks are written with syntax similar to that of an Objective-C @implementation.
-You don't need to #include <substrate.h>, it will be done automatically, as will
-the generation of a class list and an automatic constructor.
+// Logos by Dustin Howett
+// See http://iphonedevwiki.net/index.php/Logos
 
-%hook ClassName
+@interface MediaControlsHeaderView : UIView 
+@property (nonatomic,retain) UIButton *routingButton; 
+@property (assign,nonatomic) BOOL shouldUseOverrideSize;
 
-// Hooking a class method
-+ (id)sharedInstance {
-	return %orig;
+- (void)layoutSubviews;
+- (void)clearOverrideSize;
+- (void)setOverrideSize:(CGSize)arg1 ;
+- (UIButton *)routingButton;
+- (void)setRoutingButton:(UIButton *)arg1 ;
+- (BOOL)shouldUseOverrideSize;
+@end
+
+@interface MRPlatterViewController : UIViewController
+@property (nonatomic,retain) UIView *routingCornerView; 
+@property (nonatomic,retain) UIView *parentContainerView; /* This is song progress bar, previous, play / pause, next */
+@property (nonatomic,retain) MediaControlsHeaderView* nowPlayingHeaderView; /* This is the top bar, so, artwork, title, artist, album and casting */
+
+-(void)viewWillAppear:(BOOL)arg1 ;
+-(void)viewWillDisappear:(BOOL)arg1 ;
+-(void)viewDidLoad;
+
+@end
+
+%hook MediaControlsHeaderView
+CGRect originalRouteRect;
+UIView *padlockView;
+
+- (UIButton *)routingButton {
+	UIButton *origButton = %orig;
+	if (CGRectIsEmpty(originalRouteRect)) {
+		originalRouteRect = origButton.frame;
+	}
+	CGRect newRouteFrame = CGRectMake(self.frame.size.width - originalRouteRect.size.width - 15, self.frame.size.height - originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+	origButton.frame = newRouteFrame;
+	return origButton;
 }
 
-// Hooking an instance method with an argument.
-- (void)messageName:(int)argument {
-	%log; // Write a message about this call, including its class, name and arguments, to the system log.
-
-	%orig; // Call through to the original function with its original arguments.
-	%orig(nil); // Call through to the original function with a custom argument.
-
-	// If you use %orig(), you MUST supply all arguments (except for self and _cmd, the automatically generated ones.)
+- (void)setRoutingButton:(UIButton *)arg1 {
+	%orig(arg1);
+	if (CGRectIsEmpty(originalRouteRect)) {
+		originalRouteRect = arg1.frame;
+	}
+	CGRect newRouteFrame = CGRectMake(self.frame.size.width - originalRouteRect.size.width - 15, self.frame.size.height - originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+	arg1.frame = newRouteFrame;
 }
 
-// Hooking an instance method with no arguments.
-- (id)noArguments {
-	%log;
-	id awesome = %orig;
-	[awesome doSomethingElse];
-
-	return awesome;
-}
-
-// Always make sure you clean up after yourself; Not doing so could have grave consequences!
 %end
-*/
+
+
+%hook MRPlatterViewController
+UIView *padlockView;
+
+-(void)viewWillAppear:(BOOL)arg1 {
+	%orig(arg1);
+	//The routing button is:
+	UIButton *routeButton = self.nowPlayingHeaderView.routingButton;
+	CGRect originalRouteRect = routeButton.frame;
+	CGRect padlockFrame =  CGRectMake(originalRouteRect.origin.x, originalRouteRect.origin.y-originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+	
+	if (!padlockView) {
+		padlockView = [[UIView alloc] initWithFrame:CGRectZero];
+		[self.nowPlayingHeaderView addSubview: padlockView];
+	}
+	[padlockView setFrame: padlockFrame];
+	[padlockView setBackgroundColor:[UIColor redColor]];
+}
+
+%end
+
