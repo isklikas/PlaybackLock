@@ -30,42 +30,60 @@ UIView *padlockView;
 
 - (UIButton *)routingButton {
 	UIButton *origButton = %orig;
-	if (CGRectIsEmpty(originalRouteRect)) {
-		originalRouteRect = origButton.frame;
+	id superDuperView = self.superview.superview.superview;
+	if ([superDuperView isMemberOfClass:[NSClassFromString(@"CSMediaControlsView") class]]) {
+		if (CGRectIsEmpty(originalRouteRect)) {
+			originalRouteRect = origButton.frame;
+		}
+		CGRect newRouteFrame = CGRectMake(self.frame.size.width - originalRouteRect.size.width - 15, self.frame.size.height - originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+		origButton.frame = newRouteFrame;
 	}
-	CGRect newRouteFrame = CGRectMake(self.frame.size.width - originalRouteRect.size.width - 15, self.frame.size.height - originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
-	origButton.frame = newRouteFrame;
 	return origButton;
 }
 
 - (void)setRoutingButton:(UIButton *)arg1 {
 	%orig(arg1);
-	if (CGRectIsEmpty(originalRouteRect)) {
-		originalRouteRect = arg1.frame;
+	id superDuperView = self.superview.superview.superview;
+	if ([superDuperView isMemberOfClass:[NSClassFromString(@"CSMediaControlsView") class]]) {
+		if (CGRectIsEmpty(originalRouteRect)) {
+			originalRouteRect = arg1.frame;
+		}
+		CGRect newRouteFrame = CGRectMake(self.frame.size.width - originalRouteRect.size.width - 15, self.frame.size.height - originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+		arg1.frame = newRouteFrame;
 	}
-	CGRect newRouteFrame = CGRectMake(self.frame.size.width - originalRouteRect.size.width - 15, self.frame.size.height - originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
-	arg1.frame = newRouteFrame;
 }
 
 %end
 
 
 %hook MRPlatterViewController
+
+/*
+self.nowPlayingHeaderView:
+1x superview: UIView (generic).
+2x: BoundsChangeAwareView
+3x: CSMediaControlsView (at LS), UIScrollView otherwise. This allows us to distinguish and only show the tweak at the lock screen.
+*/
+
 UIView *padlockView;
 
 -(void)viewWillAppear:(BOOL)arg1 {
 	%orig(arg1);
 	//The routing button is:
 	UIButton *routeButton = self.nowPlayingHeaderView.routingButton;
-	CGRect originalRouteRect = routeButton.frame;
-	CGRect padlockFrame =  CGRectMake(originalRouteRect.origin.x, originalRouteRect.origin.y-originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
 	
-	if (!padlockView) {
-		padlockView = [[UIView alloc] initWithFrame:CGRectZero];
-		[self.nowPlayingHeaderView addSubview: padlockView];
+	id superDuperView = self.nowPlayingHeaderView.superview.superview.superview;
+	if ([superDuperView isMemberOfClass:[NSClassFromString(@"CSMediaControlsView") class]]) {
+		CGRect originalRouteRect = routeButton.frame;
+		CGRect padlockFrame =  CGRectMake(originalRouteRect.origin.x, originalRouteRect.origin.y-originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+	
+		if (!padlockView) {
+			padlockView = [[UIView alloc] initWithFrame:CGRectZero];
+			[self.nowPlayingHeaderView addSubview: padlockView];
+		}
+		[padlockView setFrame: padlockFrame];
+		[padlockView setBackgroundColor:[UIColor redColor]];
 	}
-	[padlockView setFrame: padlockFrame];
-	[padlockView setBackgroundColor:[UIColor redColor]];
 }
 
 %end
