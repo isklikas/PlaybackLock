@@ -1,4 +1,4 @@
-Package: com.twickd.john-sklikas.3playbacklock
+Package: com.twickd.john-sklikas.playbacklock
 Name: PlaybackLock
 Depends: mobilesubstrate
 Version: 0.0.1

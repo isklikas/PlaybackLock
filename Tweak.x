@@ -24,9 +24,11 @@
 
 @end
 
+#import "LockView.h"
+
 %hook MediaControlsHeaderView
 CGRect originalRouteRect;
-UIView *padlockView;
+LockView *padlockView;
 
 - (UIButton *)routingButton {
 	UIButton *origButton = %orig;
@@ -65,7 +67,8 @@ self.nowPlayingHeaderView:
 3x: CSMediaControlsView (at LS), UIScrollView otherwise. This allows us to distinguish and only show the tweak at the lock screen.
 */
 
-UIView *padlockView;
+LockView *padlockView;
+CGFloat currentProgress;
 
 -(void)viewWillAppear:(BOOL)arg1 {
 	%orig(arg1);
@@ -75,15 +78,64 @@ UIView *padlockView;
 	id superDuperView = self.nowPlayingHeaderView.superview.superview.superview;
 	if ([superDuperView isMemberOfClass:[NSClassFromString(@"CSMediaControlsView") class]]) {
 		CGRect originalRouteRect = routeButton.frame;
-		CGRect padlockFrame =  CGRectMake(originalRouteRect.origin.x, originalRouteRect.origin.y-originalRouteRect.size.height, originalRouteRect.size.width, originalRouteRect.size.height);
+		CGRect padlockFrame =  CGRectMake(originalRouteRect.origin.x + 8, originalRouteRect.origin.y-originalRouteRect.size.height + 5, originalRouteRect.size.width - 16, originalRouteRect.size.height - 10);
 	
 		if (!padlockView) {
-			padlockView = [[UIView alloc] initWithFrame:CGRectZero];
+			currentProgress = 0.00f;
+			
+			padlockView = [[LockView alloc] initWithFrame:padlockFrame];
+			
+			UITapGestureRecognizer *tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tap:)];
+    		[padlockView addGestureRecognizer:tapGesture];
+    		
 			[self.nowPlayingHeaderView addSubview: padlockView];
 		}
 		[padlockView setFrame: padlockFrame];
-		[padlockView setBackgroundColor:[UIColor redColor]];
 	}
+}
+
+%new
+- (void)tap:(id)sender {
+    // Run a fixed animation to (un)lock depending on current progress
+    if (padlockView.progress < 1.0) {
+        padlockView.progress = 0;
+        currentProgress = 0.0;
+        
+        [self performSelector:@selector(animatePadlockViewWithDuration:andDestination:) withObject:[NSNumber numberWithFloat: 18.0] withObject:[NSNumber numberWithFloat: 1.0]]; //Write the time you intend, times x60. No idea why.
+    }
+    else {
+        currentProgress = 1.0;
+        [self performSelector:@selector(animatePadlockViewWithDuration:andDestination:) withObject:[NSNumber numberWithFloat: 18.0] withObject:[NSNumber numberWithFloat: 0.0]]; //Write the time you intend, times x60. No idea why.
+    }
+    
+}
+
+%new
+- (void)animatePadlockViewWithDuration:(NSNumber *)durationObj andDestination:(NSNumber *)destinationObj {
+	CGFloat duration = [durationObj floatValue];
+	CGFloat destination = [destinationObj floatValue];
+    [UIView animateWithDuration:0.01 animations:^{
+        padlockView.progress = currentProgress;
+    } completion:^(BOOL finished) {
+        /* Destination is either 1, or 0, so we can base our decisions here*/
+        //The step is 0.01 divided by total duration, multiplied by the destination, which is 1 (or a decrease by 1 so it can be skipped as a neutral multiplier).
+        CGFloat animationProgress = 100 * fabs(destination - currentProgress); //This when complete will approach 0. So when times 100, it's less than 1, it's complete
+        if (animationProgress > 1) {
+            CGFloat stepValue = 0.01 / duration;
+            if (destination == 1.0) {
+                //This means values go up.
+                currentProgress += stepValue;
+            }
+            else {
+                //This means we must go to 0.
+                currentProgress -= stepValue;
+            }
+            [self performSelector:@selector(animatePadlockViewWithDuration:andDestination:) withObject:durationObj withObject:destinationObj];
+        }
+        else {
+            padlockView.progress = destination;
+        }
+    }];
 }
 
 %end
